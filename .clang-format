@@ -1,0 +1,24 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 0
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true # 允许短case标签在一行
+AllowAllParametersOfDeclarationOnNextLine: true # 允许函数声明和定义的参数换行
+AllowAllArgumentsOfDeclarationOnNextLine: true  # 允许函数声明和定义的参数换行
+
+SpaceInEmptyParentheses: false     # 空圆括号中添加空格
+
+AlignConsecutiveAssignments: true   # 对齐连续赋值
+AlignConsecutiveDeclarations: false  # 对齐连续声明
+AlignOperands: true                 # 对齐二元运算符的操作数
+
+AlignTrailingComments: true        # 对齐尾随注释
+ReflowComments: true                # 自动换行注释
+FixNamespaceComments: true         # 自动修复命名空间注释
+
+SortIncludes: true                 # 排序include语句
+SortUsingDeclarations: true        # 排序using声明
+
+AccessModifierOffset: -4            # 访问修饰符偏移量

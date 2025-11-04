@@ -1,0 +1,20 @@
+# Ensure text files are normalized line endings on check-in and converted to native format on checkout.
+* text=auto
+
+# Explicitly declare binary files as such to avoid mangling their contents during line ending conversion.
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.eot binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.svgz binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.rar binary
+*.zip binary
