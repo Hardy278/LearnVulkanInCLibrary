@@ -1,4 +1,6 @@
 #pragma once
+#include "../utils/Math.hpp"
+
 #include <vulkan/vulkan.h>
 
 #include <optional>
@@ -18,6 +20,11 @@ const bool ENABLE_VALIDATION_LAYER = false;
 #else
 const bool ENABLE_VALIDATION_LAYER = true;
 #endif
+
+const std::vector<engine::utils::Vertex> vertices = {
+    {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
 #pragma endregion
 
 /**
@@ -88,14 +95,18 @@ private:
     VkPipelineLayout m_pipelineLayout; // 管道布局
     VkPipeline m_graphicsPipeline;     // 渲染管道
 
-    VkCommandPool m_commandPool;                   // 命令池
+    VkCommandPool m_commandPool; // 命令池
+
+    VkBuffer m_vertexBuffer;             // 顶点缓冲区
+    VkDeviceMemory m_vertexBufferMemory; // 顶点缓冲区内存
+
     std::vector<VkCommandBuffer> m_commandBuffers; // 命令缓冲区
 
     std::vector<VkSemaphore> m_imageAvailableSemaphores; // 图像可用信号量
     std::vector<VkSemaphore> m_renderFinishedSemaphores; // 渲染完成信号量
     std::vector<VkFence> m_inFlightFences;               // 在飞行中的帧缓冲区
-    uint32_t m_currentFrame = 0;                         // 当前帧
 
+    uint32_t m_currentFrame   = 0;     // 当前帧
     bool m_framebufferResized = false; // 是否调整了窗口大小
 #pragma endregion
 
@@ -162,6 +173,11 @@ private:
     void drawFrame();
     void cleanupSwapChain();
     void recreateSwapChain();
+#pragma endregion
+
+#pragma region Buffer and Image
+    void createVertexBuffer();
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 #pragma endregion
 };
 } // namespace engine::render

@@ -30,6 +30,7 @@ void VulkanRenderer::initVulkan() {
     createGraphicsPipeline(); //  创建图形管线
     createFramebuffers();     //  创建帧缓冲区
     createCommandPool();      //  创建命令池
+    createVertexBuffer();     //  创建顶点缓冲区
     createCommandBuffers();   //  创建命令缓冲区
     createSyncObjects();      //  创建同步对象
     m_initialized = true;     //  设置初始化标志
@@ -46,6 +47,9 @@ void VulkanRenderer::cleanup() {
         vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
         vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+
+        vkDestroyBuffer(m_device, m_vertexBuffer, nullptr);
+        vkFreeMemory(m_device, m_vertexBufferMemory, nullptr);
         for (size_t i = 0; i < m_commandBuffers.size(); i++) {
             vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
             vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
@@ -517,10 +521,12 @@ void VulkanRenderer::createGraphicsPipeline() {
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount   = 0;       // 设置顶点绑定描述数量，这里设置为0，因为我们没有顶点绑定描述
-    vertexInputInfo.pVertexBindingDescriptions      = nullptr; // 设置顶点绑定描述，这里设置为nullptr，因为我们没有顶点绑定描述
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;       // 设置顶点属性描述数量，这里设置为0，因为我们没有顶点属性描述
-    vertexInputInfo.pVertexAttributeDescriptions    = nullptr; // 设置顶点属性描述，这里设置为nullptr，因为我们没有顶点属性描述
+    auto bindingDescription                         = engine::utils::Vertex::getBindingDescription();      // 获取顶点绑定描述
+    auto attributeDescriptions                      = engine::utils::Vertex::getAttributeDescriptions();   // 获取顶点属性描述
+    vertexInputInfo.vertexBindingDescriptionCount   = 1;                                                   // 设置顶点绑定描述数量
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()); // 设置顶点属性描述数量
+    vertexInputInfo.pVertexBindingDescriptions      = &bindingDescription;                                 // 设置顶点绑定描述
+    vertexInputInfo.pVertexAttributeDescriptions    = attributeDescriptions.data();                        // 设置顶点属性描述
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -730,7 +736,12 @@ void VulkanRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
         scissor.offset = {0, 0};            // 设置剪裁区域偏移
         scissor.extent = m_swapChainExtent; // 设置剪裁区域大小
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0); // 绘制三角形
+
+        VkBuffer vertexBuffers[] = {m_vertexBuffer}; // 绑定顶点缓冲
+        VkDeviceSize offsets[]   = {0};          // 设置顶点缓冲偏移
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets); // 绑定顶点缓冲
+
+        vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0); // 绘制三角形
     }
     vkCmdEndRenderPass(commandBuffer);
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -825,6 +836,47 @@ void VulkanRenderer::recreateSwapChain() {
     createSwapChain();
     createImageViews();
     createFramebuffers();
+    spdlog::trace("VulkanRenderer::recreateSwapChain()::重新创建交换链成功");
+}
+#pragma endregion
+
+#pragma region Buffer and Image
+void VulkanRenderer::createVertexBuffer() {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size        = sizeof(vertices[0]) * vertices.size(); // 设置缓冲区大小
+    bufferInfo.usage       = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;     // 设置缓冲区用途
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;             // 设置共享模式
+    if (vkCreateBuffer(m_device, &bufferInfo, nullptr, &m_vertexBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("VulkanRenderer::createVertexBuffer()::创建顶点缓冲失败");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(m_device, m_vertexBuffer, &memRequirements);
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize  = memRequirements.size;                                                                                                       // 设置分配大小
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); // 设置内存类型
+    if (vkAllocateMemory(m_device, &allocInfo, nullptr, &m_vertexBufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("VulkanRenderer::createVertexBuffer()::分配顶点缓冲内存失败");
+    }
+    vkBindBufferMemory(m_device, m_vertexBuffer, m_vertexBufferMemory, 0); // 绑定缓冲区内存
+
+    void *data;
+    vkMapMemory(m_device, m_vertexBufferMemory, 0, bufferInfo.size, 0, &data); // 映射内存
+    memcpy(data, vertices.data(), (size_t)bufferInfo.size);                    // 复制数据到内存
+    vkUnmapMemory(m_device, m_vertexBufferMemory);                             // 解除映射
+    spdlog::trace("VulkanRenderer::createVertexBuffer()::创建顶点缓冲成功");
+}
+uint32_t VulkanRenderer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memProperties; // 获取物理设备的内存属性
+    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memProperties);
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    throw std::runtime_error("VulkanRenderer::findMemoryType()::找不到合适的内存类型");
 }
 #pragma endregion
 
